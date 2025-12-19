@@ -15,6 +15,7 @@ function App() {
   // Batch State
   const [batch, setBatch] = useState({ source_chat_id: '', target_chat_id: '', limit: 50, onlyAlbums: false });
   const [mediaCount, setMediaCount] = useState(null);
+  const [progress, setProgress] = useState(null);
 
   const [botInfo, setBotInfo] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -27,10 +28,12 @@ function App() {
       addLog({ message: '🔌 Conectado ao servidor de logs', type: 'system', time: new Date().toLocaleTimeString() });
     });
     socket.on('log', (log) => addLog(log));
+    socket.on('progress', (data) => setProgress(data));
 
     return () => {
       socket.off('connect');
       socket.off('log');
+      socket.off('progress');
     };
   }, []);
 
@@ -227,9 +230,23 @@ function App() {
                   </label>
                 </div>
 
-                <button type="submit" className="btn accent full-width">
-                  <Send size={16} /> Iniciar Envio
+                <button type="submit" className="btn accent full-width" disabled={!!progress}>
+                  <Send size={16} /> {progress ? 'Enviando...' : 'Iniciar Envio'}
                 </button>
+
+                {progress && (
+                  <div className="progress-container">
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${(progress.processed / progress.total) * 100}%` }}
+                      ></div>
+                    </div>
+                    <div className="progress-text">
+                      Enviando lote: {progress.processed} / {progress.total}
+                    </div>
+                  </div>
+                )}
               </form>
             </section>
           </div>

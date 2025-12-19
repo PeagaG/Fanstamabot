@@ -257,3 +257,43 @@ td {
   opacity: 0.5;
   margin-right: 0.5rem;
 }
+
+/* Progress Bar */
+.progress-container {
+  margin-top: 1rem;
+}
+
+.progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--purple-color);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Thread Badge */
+.target-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.thread-badge {
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--purple-color);
+    font-size: 0.7rem;
+    padding: 1px 5px;
+    border-radius: 4px;
+}

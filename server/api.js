@@ -81,8 +81,10 @@ router.post('/batch-forward', async (req, res) => {
         res.json({ success: true, message: `Started forwarding ${batchItems.length} batches (Only Albums).` });
 
         (async () => {
+            const total = batchItems.length;
             let processed = 0;
             let i = 0;
+            io.emit('progress', { processed: 0, total });
 
             while (i < batchItems.length) {
                 const batch = batchItems[i];
@@ -129,6 +131,7 @@ router.post('/batch-forward', async (req, res) => {
 
                     // Success: Next batch
                     i++;
+                    io.emit('progress', { processed: i, total });
                     await new Promise(r => setTimeout(r, 4000)); // 4s delay between batches
 
                 } catch (e) {
@@ -148,6 +151,7 @@ router.post('/batch-forward', async (req, res) => {
             }
 
             io.emit('log', { time: new Date().toLocaleTimeString(), type: 'system', message: `✅ Batch Complete` });
+            io.emit('progress', null); // Reset progress
 
         })();
 
