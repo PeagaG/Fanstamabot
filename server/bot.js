@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const db = require('./db');
-require('dotenv').config();
+
 
 let bot;
 let botInfo = {};

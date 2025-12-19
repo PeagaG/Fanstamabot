@@ -46,7 +46,7 @@ const distPath = path.join(__dirname, '../web/dist');
 if (require('fs').existsSync(distPath)) {
     app.use(express.static(distPath));
     // SPA Fallback
-    app.get('*', (req, res) => {
+    app.get(/(.*)/, (req, res) => {
         if (!req.path.startsWith('/api')) {
             res.sendFile(path.join(distPath, 'index.html'));
         }
