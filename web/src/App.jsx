@@ -3,8 +3,8 @@ import { Trash2, Plus, Power, PowerOff, Activity, Bot, RefreshCw, Layers, Send }
 import io from 'socket.io-client';
 import './App.css';
 
-const API_URL = 'http://localhost:3000/api';
-const socket = io('http://localhost:3000');
+const API_URL = '/api';
+const socket = io();
 
 function App() {
   const [rules, setRules] = useState([]);

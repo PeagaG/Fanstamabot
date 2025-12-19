@@ -71,14 +71,14 @@ const initBot = (io) => {
                 io.emit('log', {
                     time: new Date().toLocaleTimeString(),
                     type: 'forward',
-                    message: `✅ Forwarded Album (${messages.length}) to [${rule.target_chat_id}]`
+                    message: `✅ Álbum Encaminhado (${messages.length}) para [${rule.target_chat_id}]`
                 });
             } catch (error) {
                 console.error(`Failed album to ${rule.target_chat_id}:`, error.message);
                 io.emit('log', {
                     time: new Date().toLocaleTimeString(),
                     type: 'error',
-                    message: `❌ Failed album: ${error.message}`
+                    message: `❌ Falha no álbum: ${error.message}`
                 });
             }
         }
@@ -114,7 +114,7 @@ const initBot = (io) => {
         io.emit('log', {
             time: new Date().toLocaleTimeString(),
             type: 'receive',
-            message: `Msg from [${chatTitle}]`
+            message: `📩 Msg de [${chatTitle}]`
         });
 
         // LIVE FORWARDING LOGIC
@@ -141,7 +141,7 @@ const initBot = (io) => {
                     parse_mode: msg.parse_mode,
                     caption_entities: msg.caption_entities
                 });
-                io.emit('log', { time: new Date().toLocaleTimeString(), type: 'forward', message: `✅ Forwarded to [${rule.target_chat_id}]` });
+                io.emit('log', { time: new Date().toLocaleTimeString(), type: 'forward', message: `✅ Encaminhado para [${rule.target_chat_id}]` });
             } catch (error) {
                 console.error(error);
             }
