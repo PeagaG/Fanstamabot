@@ -42,7 +42,7 @@ const initBot = (io) => {
         albumBuffer.get(chatId).delete(mediaGroupId); // Clear buffer
 
         // Find targets
-        const rules = db.prepare('SELECT target_chat_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
+        const rules = db.prepare('SELECT target_chat_id, target_thread_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
         if (rules.length === 0) return;
 
         // Construct MediaGroup
@@ -66,7 +66,10 @@ const initBot = (io) => {
 
         for (const rule of rules) {
             try {
-                await bot.sendMediaGroup(rule.target_chat_id, mediaGroup);
+                const options = {};
+                if (rule.target_thread_id) options.message_thread_id = rule.target_thread_id;
+
+                await bot.sendMediaGroup(rule.target_chat_id, mediaGroup, options);
                 console.log(`Forwarded Album (${messages.length}) to ${rule.target_chat_id}`);
                 io.emit('log', {
                     time: new Date().toLocaleTimeString(),
@@ -134,13 +137,18 @@ const initBot = (io) => {
         }
 
         // Single Message Forwarding
-        for (const rule of rules) {
+        const rulesSingle = db.prepare('SELECT target_chat_id, target_thread_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
+
+        for (const rule of rulesSingle) {
             try {
-                await bot.copyMessage(rule.target_chat_id, chatId, msg.message_id, {
+                const options = {
                     caption: msg.caption,
                     parse_mode: msg.parse_mode,
                     caption_entities: msg.caption_entities
-                });
+                };
+                if (rule.target_thread_id) options.message_thread_id = rule.target_thread_id;
+
+                await bot.copyMessage(rule.target_chat_id, chatId, msg.message_id, options);
                 io.emit('log', { time: new Date().toLocaleTimeString(), type: 'forward', message: `✅ Encaminhado para [${rule.target_chat_id}]` });
             } catch (error) {
                 console.error(error);

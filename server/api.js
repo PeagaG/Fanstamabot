@@ -161,7 +161,7 @@ router.get('/rules', (req, res) => {
 });
 router.post('/rules', (req, res) => {
     try {
-        const info = db.prepare('INSERT INTO forwarding_rules (source_chat_id, target_chat_id, title) VALUES (?, ?, ?)').run(req.body.source_chat_id, req.body.target_chat_id, req.body.title || 'Untitled');
+        const info = db.prepare('INSERT INTO forwarding_rules (source_chat_id, target_chat_id, title, target_thread_id) VALUES (?, ?, ?, ?)').run(req.body.source_chat_id, req.body.target_chat_id, req.body.title || 'Untitled', req.body.target_thread_id || null);
         res.json({ id: info.lastInsertRowid, ...req.body, active: 1 });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

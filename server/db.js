@@ -57,4 +57,8 @@ try {
     db.prepare('ALTER TABLE media_log ADD COLUMN caption TEXT').run();
 } catch (e) { /* Column likely exists */ }
 
+try {
+    db.prepare('ALTER TABLE forwarding_rules ADD COLUMN target_thread_id INTEGER').run();
+} catch (e) { /* Column likely exists */ }
+
 module.exports = db;

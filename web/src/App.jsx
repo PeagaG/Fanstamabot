@@ -10,7 +10,7 @@ function App() {
   const [rules, setRules] = useState([]);
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newRule, setNewRule] = useState({ source_chat_id: '', target_chat_id: '', title: '' });
+  const [newRule, setNewRule] = useState({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '' });
 
   // Batch State
   const [batch, setBatch] = useState({ source_chat_id: '', target_chat_id: '', limit: 50, onlyAlbums: false });
@@ -74,7 +74,7 @@ function App() {
         body: JSON.stringify(newRule),
       });
       if (res.ok) {
-        setNewRule({ source_chat_id: '', target_chat_id: '', title: '' });
+        setNewRule({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '' });
         fetchData();
         addLog({ message: 'Regra adicionada', type: 'success', time: new Date().toLocaleTimeString() });
       }
@@ -179,6 +179,15 @@ function App() {
                   <label>Destino (Receptor)</label>
                   {renderChatSelect(newRule.target_chat_id, (v) => setNewRule({ ...newRule, target_chat_id: v }))}
                 </div>
+                <div className="form-group">
+                  <label>ID do Tópico (Opcional)</label>
+                  <input
+                    type="number"
+                    placeholder="Ex: 5"
+                    value={newRule.target_thread_id || ''}
+                    onChange={(e) => setNewRule({ ...newRule, target_thread_id: e.target.value })}
+                  />
+                </div>
                 <button type="submit" className="btn primary full-width">Adicionar Regra</button>
               </form>
             </section>
@@ -256,7 +265,10 @@ function App() {
                           <div className="flow">
                             <span className="source">{rule.source_title || rule.source_chat_id}</span>
                             <span className="arrow">➔</span>
-                            <span className="target">{rule.target_title || rule.target_chat_id}</span>
+                            <div className="target-container">
+                              <span className="target">{rule.target_title || rule.target_chat_id}</span>
+                              {rule.target_thread_id && <span className="thread-badge">#{rule.target_thread_id}</span>}
+                            </div>
                           </div>
                           <div className="rule-title">{rule.title}</div>
                         </td>
