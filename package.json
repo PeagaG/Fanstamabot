@@ -1,0 +1,14 @@
+{
+    "name": "fanstamabot-root",
+    "version": "1.0.0",
+    "description": "Root project for Telegram Forwarder Bot",
+    "scripts": {
+        "server": "cd server && npm start",
+        "web": "cd web && npm run dev",
+        "dev": "concurrently \"npm run server\" \"npm run web\"",
+        "start": "npm run dev"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.0"
+    }
+}
