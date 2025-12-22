@@ -10,7 +10,7 @@ if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const db = new Database(path.join(dataDir, 'bot.db'), { verbose: console.log });
+const db = new Database(path.join(dataDir, 'bot.db'));
 
 // Create tables
 db.exec(`

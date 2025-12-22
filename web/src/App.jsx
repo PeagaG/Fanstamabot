@@ -6,6 +6,73 @@ import './App.css';
 const API_URL = '/api';
 const socket = io();
 
+// Componente extraído para gerenciar seleção de chat e entrada manual
+function ChatSelector({ value, onChange, chats, placeholder, onSourceChange }) {
+  // Se o valor atual não estiver na lista de chats (e não for vazio), assume modo manual
+  const isKnown = chats.some(c => c.chat_id == value);
+  const [isManual, setIsManual] = useState(!isKnown && value !== '');
+
+  // Sincroniza se o valor mudar externamente para algo conhecido
+  useEffect(() => {
+    if (isKnown) setIsManual(false);
+  }, [value, isKnown]);
+
+  const handleSelectChange = (e) => {
+    const val = e.target.value;
+    if (val === 'MANUAL_ENTRY') {
+      setIsManual(true);
+      onChange(''); // Limpa para digitar
+    } else {
+      setIsManual(false);
+      onChange(val);
+      if (onSourceChange) onSourceChange(val);
+    }
+  };
+
+  if (isManual) {
+    return (
+      <div className="input-group" style={{ display: 'flex', gap: '8px' }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            // Delay ou debounce seria ideal aqui para o fetchMediaCount, 
+            // mas por enquanto chamamos direto se necessário
+            if (onSourceChange) onSourceChange(e.target.value);
+          }}
+          placeholder="Digite o ID (Ex: -100...)"
+          style={{ flex: 1 }}
+          autoFocus
+        />
+        <button
+          type="button"
+          className="btn secondary icon-only"
+          onClick={() => { setIsManual(false); onChange(''); }}
+          title="Voltar para lista"
+        >
+          <Layers size={16} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={handleSelectChange}
+    >
+      <option value="">{placeholder || "Selecione..."}</option>
+      {chats.map(c => (
+        <option key={c.chat_id} value={c.chat_id}>
+          {c.title} ({c.type})
+        </option>
+      ))}
+      <option value="MANUAL_ENTRY" style={{ fontWeight: 'bold' }}>✏️ Digitar ID Manualmente</option>
+    </select>
+  );
+}
+
 function App() {
   const [rules, setRules] = useState([]);
   const [chats, setChats] = useState([]);
@@ -181,42 +248,7 @@ function App() {
 
   // --- Render Helpers ---
 
-  const renderChatSelect = (value, onChange, placeholder = "Selecione...", mode = "") => {
-    // Determine if the current value is "custom" (manually entered) or a known chat
-    const isCustom = value === 'custom' || (value && !chats.find(c => c.chat_id == value));
-    const selectValue = isCustom ? 'custom' : (value || "");
 
-    return (
-      <div className="input-group">
-        <select
-          value={selectValue}
-          onChange={(e) => {
-            onChange(e.target.value);
-            if (mode === 'source') fetchMediaCount(e.target.value);
-          }}
-        >
-          <option value="">{placeholder}</option>
-          {chats.map(c => (
-            <option key={c.chat_id} value={c.chat_id}>
-              {c.title} ({c.type})
-            </option>
-          ))}
-          <option value="custom">✏️ Digitar ID Manualmente</option>
-        </select>
-
-        {/* Show manual input if 'custom' OR if the current value is not in the list (and not empty) */}
-        {isCustom && (
-          <input
-            type="text"
-            placeholder="ID do Grupo (Ex: -100123...)"
-            value={value === 'custom' ? '' : value}
-            onChange={(e) => onChange(e.target.value)}
-            className="mt-2"
-          />
-        )}
-      </div>
-    );
-  };
 
   const renderTopicSelect = (value, onChange, topics, defaultLabel, chatId, refreshType) => (
     <div className="input-with-refresh">
@@ -291,7 +323,12 @@ function App() {
 
                 <div className="form-group">
                   <label>Origem (De onde vem)</label>
-                  {renderChatSelect(newRule.source_chat_id, (v) => setNewRule({ ...newRule, source_chat_id: v }))}
+                  <ChatSelector
+                    value={newRule.source_chat_id}
+                    onChange={(v) => setNewRule({ ...newRule, source_chat_id: v })}
+                    chats={chats}
+                    placeholder="Selecione um grupo..."
+                  />
                 </div>
 
                 <div className="form-group">
@@ -312,7 +349,12 @@ function App() {
 
                 <div className="form-group">
                   <label>Destino (Para onde vai)</label>
-                  {renderChatSelect(newRule.target_chat_id, (v) => setNewRule({ ...newRule, target_chat_id: v }))}
+                  <ChatSelector
+                    value={newRule.target_chat_id}
+                    onChange={(v) => setNewRule({ ...newRule, target_chat_id: v })}
+                    chats={chats}
+                    placeholder="Selecione um grupo..."
+                  />
                 </div>
 
                 <div className="form-group">
@@ -338,7 +380,13 @@ function App() {
 
                 <div className="form-group">
                   <label>Origem da Clonagem</label>
-                  {renderChatSelect(batch.source_chat_id, (v) => setBatch({ ...batch, source_chat_id: v }), "Selecione a origem...", 'source')}
+                  <ChatSelector
+                    value={batch.source_chat_id}
+                    onChange={(v) => setBatch({ ...batch, source_chat_id: v })}
+                    chats={chats}
+                    placeholder="Selecione a origem..."
+                    onSourceChange={fetchMediaCount}
+                  />
                   {mediaCount !== null && (
                     <div className="count-badge">📦 {mediaCount} mídias registradas</div>
                   )}
@@ -358,7 +406,11 @@ function App() {
 
                 <div className="form-group">
                   <label>Destino</label>
-                  {renderChatSelect(batch.target_chat_id, (v) => setBatch({ ...batch, target_chat_id: v }))}
+                  <ChatSelector
+                    value={batch.target_chat_id}
+                    onChange={(v) => setBatch({ ...batch, target_chat_id: v })}
+                    chats={chats}
+                  />
                 </div>
 
                 <div className="form-group">
