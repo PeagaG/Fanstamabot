@@ -139,25 +139,65 @@ select {
   font-size: 0.8rem;
   color: var(--success-color);
   margin-top: 0.3rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: var(--transition);
 }
 
-.btn {
-  width: 100%;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+/* Button & Inputs Grouping */
+.input-group,
+.input-with-refresh {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-with-refresh {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.input-with-refresh select,
+.input-with-refresh input {
+  flex: 1;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  transition: 0.2s;
+  gap: 8px;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition);
+  font-size: 0.95rem;
 }
 
 .btn.primary {
-  background: var(--accent-color);
+  background: var(--primary-color);
   color: white;
+}
+
+.btn.primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
 }
 
 .btn.accent {
