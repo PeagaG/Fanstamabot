@@ -181,36 +181,42 @@ function App() {
 
   // --- Render Helpers ---
 
-  const renderChatSelect = (value, onChange, placeholder = "Selecione um grupo...", mode = "") => (
-    <div className="input-group">
-      <select
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          if (mode === 'source') fetchMediaCount(e.target.value);
-        }}
-      >
-        <option value="">{placeholder}</option>
-        {chats.map(c => (
-          <option key={c.chat_id} value={c.chat_id}>
-            {c.title} ({c.type})
-          </option>
-        ))}
-        <option value="custom">✏️ Digitar ID Manualmente</option>
-      </select>
+  const renderChatSelect = (value, onChange, placeholder = "Selecione...", mode = "") => {
+    // Determine if the current value is "custom" (manually entered) or a known chat
+    const isCustom = value === 'custom' || (value && !chats.find(c => c.chat_id == value));
+    const selectValue = isCustom ? 'custom' : (value || "");
 
-      {/* Show manual input if 'custom' OR if the current value is not in the list (and not empty) */}
-      {(value === 'custom' || (value && !chats.find(c => c.chat_id == value))) && (
-        <input
-          type="text"
-          placeholder="-100..."
-          value={value === 'custom' ? '' : value}
-          onChange={(e) => onChange(e.target.value)}
-          className="mt-2"
-        />
-      )}
-    </div>
-  );
+    return (
+      <div className="input-group">
+        <select
+          value={selectValue}
+          onChange={(e) => {
+            onChange(e.target.value);
+            if (mode === 'source') fetchMediaCount(e.target.value);
+          }}
+        >
+          <option value="">{placeholder}</option>
+          {chats.map(c => (
+            <option key={c.chat_id} value={c.chat_id}>
+              {c.title} ({c.type})
+            </option>
+          ))}
+          <option value="custom">✏️ Digitar ID Manualmente</option>
+        </select>
+
+        {/* Show manual input if 'custom' OR if the current value is not in the list (and not empty) */}
+        {isCustom && (
+          <input
+            type="text"
+            placeholder="ID do Grupo (Ex: -100123...)"
+            value={value === 'custom' ? '' : value}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-2"
+          />
+        )}
+      </div>
+    );
+  };
 
   const renderTopicSelect = (value, onChange, topics, defaultLabel, chatId, refreshType) => (
     <div className="input-with-refresh">
