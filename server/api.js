@@ -51,8 +51,27 @@ function groupMessages(messages) {
     return groups;
 }
 
+router.get('/chats/:chatId/topics', (req, res) => {
+    try {
+        const topics = db.prepare('SELECT * FROM known_topics WHERE chat_id = ? ORDER BY name ASC').all(req.params.chatId);
+        res.json(topics);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.get('/chats/:chatId/media-topics', (req, res) => {
+    try {
+        const topics = db.prepare(`
+            SELECT DISTINCT m.topic_id, t.name 
+            FROM media_log m 
+            LEFT JOIN known_topics t ON m.chat_id = t.chat_id AND m.topic_id = t.topic_id 
+            WHERE m.chat_id = ? AND m.topic_id IS NOT NULL
+        `).all(req.params.chatId);
+        res.json(topics);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/batch-forward', async (req, res) => {
-    const { source_chat_id, target_chat_id, limit, onlyAlbums } = req.body;
+    const { source_chat_id, target_chat_id, limit, onlyAlbums, source_topic_id, target_thread_id } = req.body;
     const io = req.app.get('io');
     const bot = getBot();
 
@@ -61,10 +80,18 @@ router.post('/batch-forward', async (req, res) => {
     try {
         // Fetch last N media (fetching a bit more to ensure we get albums if mixed)
         // If we strictly limit by SQL, we might cut an album in half or get mostly singles.
-        // Ideally we should filter in SQL for media_group_id IS NOT NULL but user might want "Albums mixed in last 100 messages".
-        // Let's stick to fetch -> group -> filter logic for simplicity.
-        const rows = db.prepare('SELECT message_id, media_group_id, file_id, caption, file_type FROM media_log WHERE chat_id = ? ORDER BY message_id DESC LIMIT ?')
-            .all(source_chat_id, limit || 50);
+        let sql = 'SELECT message_id, media_group_id, file_id, caption, file_type, topic_id FROM media_log WHERE chat_id = ?';
+        const params = [source_chat_id];
+
+        if (source_topic_id) {
+            sql += ' AND topic_id = ?';
+            params.push(source_topic_id);
+        }
+
+        sql += ' ORDER BY message_id DESC LIMIT ?';
+        params.push(limit || 50);
+
+        const rows = db.prepare(sql).all(...params);
 
         rows.reverse(); // Chronological order
         let batchItems = groupMessages(rows);
@@ -75,10 +102,10 @@ router.post('/batch-forward', async (req, res) => {
         }
 
         if (batchItems.length === 0) {
-            return res.json({ success: true, message: `Nenhum álbum encontrado nas últimas ${rows.length} mídias.` });
+            return res.json({ success: true, message: `Nenhum item encontrado nas últimas ${rows.length} mídias.` });
         }
 
-        res.json({ success: true, message: `Started forwarding ${batchItems.length} batches (Only Albums).` });
+        res.json({ success: true, message: `Started forwarding ${batchItems.length} batches.` });
 
         (async () => {
             const total = batchItems.length;
@@ -90,6 +117,10 @@ router.post('/batch-forward', async (req, res) => {
                 const batch = batchItems[i];
 
                 try {
+                    const options = {
+                        message_thread_id: target_thread_id || null
+                    };
+
                     if (batch.type === 'album' && batch.items.every(item => item.file_id)) {
                         // SEND ALBUM
                         const mediaGroup = batch.items.map(item => ({
@@ -97,10 +128,8 @@ router.post('/batch-forward', async (req, res) => {
                             media: item.file_id,
                             caption: item.caption
                         }));
-                        // Safety: ensure type is supported. Documents/Audio also supported by sendMediaGroup.
-                        // Assuming basic types for now.
 
-                        await bot.sendMediaGroup(target_chat_id, mediaGroup);
+                        await bot.sendMediaGroup(target_chat_id, mediaGroup, options);
 
                         processed += batch.items.length;
                         io.emit('log', {
@@ -110,21 +139,21 @@ router.post('/batch-forward', async (req, res) => {
                         });
                     } else {
                         // FALLBACK TO SINGLE (CopyMessage)
-                        // If album missing file_id or it's single
                         for (const item of batch.items) {
-                            // Inner loop for fallback items, handle rate limit individually?
-                            // No, simpler to just process this batch block.
-                            // But 429 might fail mid-batch.
-                            // To keep simple: If fallback, we treat them one by one.
-                            // But for the outer loop structure, let's just do them here.
-                            await bot.copyMessage(target_chat_id, source_chat_id, item.message_id);
+
+                            // Copy options need to be per item + thread_id
+                            const copyOptions = {
+                                caption: item.caption,
+                                message_thread_id: options.message_thread_id
+                            };
+
+                            await bot.copyMessage(target_chat_id, source_chat_id, item.message_id, copyOptions);
                             processed++;
                             io.emit('log', {
                                 time: new Date().toLocaleTimeString(),
                                 type: 'forward',
                                 message: `📦 Batch Item sent to [${target_chat_id}]`
                             });
-                            // Small delay between fallback items
                             await new Promise(r => setTimeout(r, 1000));
                         }
                     }

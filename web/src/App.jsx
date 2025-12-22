@@ -13,9 +13,14 @@ function App() {
   const [newRule, setNewRule] = useState({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '' });
 
   // Batch State
-  const [batch, setBatch] = useState({ source_chat_id: '', target_chat_id: '', limit: 50, onlyAlbums: false });
+  const [batch, setBatch] = useState({ source_chat_id: '', target_chat_id: '', limit: 50, onlyAlbums: false, source_topic_id: '', target_thread_id: '' });
   const [mediaCount, setMediaCount] = useState(null);
   const [progress, setProgress] = useState(null);
+
+  // Topics State
+  const [ruleTargetTopics, setRuleTargetTopics] = useState([]);
+  const [batchSourceTopics, setBatchSourceTopics] = useState([]);
+  const [batchTargetTopics, setBatchTargetTopics] = useState([]);
 
   const [botInfo, setBotInfo] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -59,6 +64,26 @@ function App() {
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
+  const fetchTopics = async (chatId, type) => {
+    if (!chatId || chatId === 'custom') {
+      if (type === 'ruleTarget') setRuleTargetTopics([]);
+      if (type === 'batchSource') setBatchSourceTopics([]);
+      if (type === 'batchTarget') setBatchTargetTopics([]);
+      return;
+    }
+    try {
+      let url = `${API_URL}/chats/${chatId}/topics`;
+      if (type === 'batchSource') url = `${API_URL}/chats/${chatId}/media-topics`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (type === 'ruleTarget') setRuleTargetTopics(data);
+      if (type === 'batchSource') setBatchSourceTopics(data);
+      if (type === 'batchTarget') setBatchTargetTopics(data);
+    } catch (e) { console.error(e); }
+  };
+
   const fetchMediaCount = async (chatId) => {
     if (!chatId || chatId === 'custom') return setMediaCount(null);
     try {
@@ -67,6 +92,21 @@ function App() {
       setMediaCount(data.count);
     } catch (e) { console.error(e); }
   };
+
+  // When Rule Target changes, fetch topics
+  useEffect(() => {
+    fetchTopics(newRule.target_chat_id, 'ruleTarget');
+  }, [newRule.target_chat_id]);
+
+  // When Batch Source/Target changes
+  useEffect(() => {
+    fetchTopics(batch.source_chat_id, 'batchSource');
+  }, [batch.source_chat_id]);
+
+  useEffect(() => {
+    fetchTopics(batch.target_chat_id, 'batchTarget');
+  }, [batch.target_chat_id]);
+
 
   const handleAddRule = async (e) => {
     e.preventDefault();
@@ -144,10 +184,38 @@ function App() {
     </div>
   );
 
+  const renderTopicSelect = (value, onChange, topics, label) => (
+    <div className="input-with-refresh">
+      <select value={value} onChange={e => onChange(e.target.value)}>
+        <option value="">{label || 'Todos / Geral'}</option>
+        {topics.map(t => (
+          <option key={t.topic_id} value={t.topic_id}>
+            {t.name} (ID: {t.topic_id})
+          </option>
+        ))}
+      </select>
+      {/* Fallback to manual input if needed? Maybe just a small input below if select is empty/insufficient? 
+               For now, let's allow typing ID if they select 'Custom' or just keep simple. 
+               We'll add a small "OR Input ID" field if they want? 
+               Let's keep it simple: Select or if you want manual, you can't via this UI unless we add "Custom" option.
+               Let's add a small input for manual override if they want.
+            */}
+      <input
+        type="number"
+        placeholder="ID Manual"
+        className="small-input"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        title="Ou digite o ID manualmente"
+      />
+    </div>
+  );
+
+
   return (
     <div className="container">
       <header className="header">
-        <h1><Activity className="icon" /> FanstamaBot <span className="badge">v2.0</span></h1>
+        <h1><Activity className="icon" /> FanstamaBot <span className="badge">v2.1</span></h1>
         <div className="bot-status">
           {botInfo ? (
             <span className="online"><Bot size={16} /> @{botInfo.username} (Online)</span>
@@ -183,13 +251,12 @@ function App() {
                   {renderChatSelect(newRule.target_chat_id, (v) => setNewRule({ ...newRule, target_chat_id: v }))}
                 </div>
                 <div className="form-group">
-                  <label>ID do Tópico (Opcional)</label>
-                  <input
-                    type="number"
-                    placeholder="Ex: 5"
-                    value={newRule.target_thread_id || ''}
-                    onChange={(e) => setNewRule({ ...newRule, target_thread_id: e.target.value })}
-                  />
+                  <label>Tópico Destino</label>
+                  {/* Refresh Button Logic: Just re-trigger fetch? We can add a refresh icon next to label */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {renderTopicSelect(newRule.target_thread_id || '', (v) => setNewRule({ ...newRule, target_thread_id: v }), ruleTargetTopics, 'Geral (Nenhum)')}
+                    <button type="button" className="btn icon-only secondary small" onClick={() => fetchTopics(newRule.target_chat_id, 'ruleTarget')} title="Atualizar Tópicos"><RefreshCw size={14} /></button>
+                  </div>
                 </div>
                 <button type="submit" className="btn primary full-width">Adicionar Regra</button>
               </form>
@@ -206,10 +273,27 @@ function App() {
                     <div className="count-badge">📦 {mediaCount} mídias disponíveis</div>
                   )}
                 </div>
+                {batch.source_chat_id && (
+                  <div className="form-group">
+                    <label>Filtrar por Tópico (Origem)</label>
+                    {renderTopicSelect(batch.source_topic_id || '', (v) => setBatch({ ...batch, source_topic_id: v }), batchSourceTopics, 'Todos os Tópicos')}
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label>Destino (Para onde enviar)</label>
                   {renderChatSelect(batch.target_chat_id, (v) => setBatch({ ...batch, target_chat_id: v }))}
                 </div>
+                {batch.target_chat_id && (
+                  <div className="form-group">
+                    <label>Enviar para Tópico (Destino)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {renderTopicSelect(batch.target_thread_id || '', (v) => setBatch({ ...batch, target_thread_id: v }), batchTargetTopics, 'Geral (Nenhum)')}
+                      <button type="button" className="btn icon-only secondary small" onClick={() => fetchTopics(batch.target_chat_id, 'batchTarget')} title="Atualizar Tópicos"><RefreshCw size={14} /></button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label>Quantidade (Últimas X mídias)</label>
                   <input

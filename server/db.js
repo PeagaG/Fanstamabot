@@ -31,10 +31,19 @@ db.exec(`
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS known_topics (
+        chat_id TEXT NOT NULL,
+        topic_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (chat_id, topic_id)
+    );
+
     CREATE TABLE IF NOT EXISTS media_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chat_id TEXT NOT NULL,
         message_id INTEGER NOT NULL,
+        topic_id INTEGER,
         media_group_id TEXT,
         file_id TEXT,
         caption TEXT,
@@ -59,6 +68,10 @@ try {
 
 try {
     db.prepare('ALTER TABLE forwarding_rules ADD COLUMN target_thread_id INTEGER').run();
+} catch (e) { /* Column likely exists */ }
+
+try {
+    db.prepare('ALTER TABLE media_log ADD COLUMN topic_id INTEGER').run();
 } catch (e) { /* Column likely exists */ }
 
 module.exports = db;
