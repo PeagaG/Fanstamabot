@@ -42,7 +42,7 @@ const initBot = (io) => {
         albumBuffer.get(chatId).delete(mediaGroupId); // Clear buffer
 
         // Find targets
-        const rules = db.prepare('SELECT target_chat_id, target_thread_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
+        const rules = db.prepare('SELECT target_chat_id, target_thread_id, source_thread_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
         if (rules.length === 0) return;
 
         // Construct MediaGroup
@@ -66,6 +66,17 @@ const initBot = (io) => {
 
         for (const rule of rules) {
             try {
+                // Topic Filter Check
+                // If rule has source_thread_id, msg must equal it.
+                // If rule source_thread_id is null/0, it matches ALL (or assume general?). 
+                // Usually "All" means null. If specific, it must match.
+                // Note: messages[0] has the topic info.
+                const msgTopicId = messages[0].is_topic_message ? messages[0].message_thread_id : null;
+
+                if (rule.source_thread_id && rule.source_thread_id != msgTopicId) {
+                    continue; // Skip if topic doesn't match
+                }
+
                 const options = {};
                 if (rule.target_thread_id) options.message_thread_id = rule.target_thread_id;
 
@@ -144,12 +155,34 @@ const initBot = (io) => {
         // Detect media
         let fileType = null;
         let fileId = null;
+        let fileUniqueId = null;
 
-        if (msg.photo) { fileType = 'photo'; fileId = msg.photo[msg.photo.length - 1].file_id; }
-        else if (msg.video) { fileType = 'video'; fileId = msg.video.file_id; }
-        else if (msg.document) { fileType = 'document'; fileId = msg.document.file_id; }
-        else if (msg.audio) { fileType = 'audio'; fileId = msg.audio.file_id; }
-        else if (msg.voice) { fileType = 'voice'; fileId = msg.voice.file_id; }
+        if (msg.photo) {
+            const p = msg.photo[msg.photo.length - 1];
+            fileType = 'photo';
+            fileId = p.file_id;
+            fileUniqueId = p.file_unique_id;
+        }
+        else if (msg.video) {
+            fileType = 'video';
+            fileId = msg.video.file_id;
+            fileUniqueId = msg.video.file_unique_id;
+        }
+        else if (msg.document) {
+            fileType = 'document';
+            fileId = msg.document.file_id;
+            fileUniqueId = msg.document.file_unique_id;
+        }
+        else if (msg.audio) {
+            fileType = 'audio';
+            fileId = msg.audio.file_id;
+            fileUniqueId = msg.audio.file_unique_id;
+        }
+        else if (msg.voice) {
+            fileType = 'voice';
+            fileId = msg.voice.file_id;
+            fileUniqueId = msg.voice.file_unique_id;
+        }
 
         const mediaGroupId = msg.media_group_id;
         const caption = msg.caption || '';
@@ -158,9 +191,9 @@ const initBot = (io) => {
         // Save to DB
         if (fileType) {
             try {
-                // Modified to include topic_id
-                db.prepare('INSERT OR IGNORE INTO media_log (chat_id, message_id, topic_id, media_group_id, file_id, caption, file_type) VALUES (?, ?, ?, ?, ?, ?, ?)')
-                    .run(chatId, msg.message_id, topicId, mediaGroupId || null, fileId, caption, fileType);
+                // Modified to include topic_id and file_unique_id
+                db.prepare('INSERT OR IGNORE INTO media_log (chat_id, message_id, topic_id, media_group_id, file_id, caption, file_type, file_unique_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                    .run(chatId, msg.message_id, topicId, mediaGroupId || null, fileId, caption, fileType, fileUniqueId);
             } catch (e) { console.error('Error saving media log:', e.message); }
         }
 
@@ -171,7 +204,7 @@ const initBot = (io) => {
         });
 
         // LIVE FORWARDING LOGIC
-        const rules = db.prepare('SELECT target_chat_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
+        const rules = db.prepare('SELECT target_chat_id, target_thread_id, source_thread_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
         if (rules.length === 0) return;
 
         // If it's part of an album, buffer it
@@ -189,10 +222,14 @@ const initBot = (io) => {
         }
 
         // Single Message Forwarding
-        const rulesSingle = db.prepare('SELECT target_chat_id, target_thread_id FROM forwarding_rules WHERE source_chat_id = ? AND active = 1').all(chatId);
+        const rulesSingle = rules; // Already fetched above with expanded columns
 
         for (const rule of rulesSingle) {
             try {
+                // Topic Filter
+                if (rule.source_thread_id && rule.source_thread_id != topicId) {
+                    continue;
+                }
                 const options = {
                     caption: msg.caption,
                     parse_mode: msg.parse_mode,

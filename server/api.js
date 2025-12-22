@@ -71,7 +71,7 @@ router.get('/chats/:chatId/media-topics', (req, res) => {
 });
 
 router.post('/batch-forward', async (req, res) => {
-    const { source_chat_id, target_chat_id, limit, onlyAlbums, source_topic_id, target_thread_id } = req.body;
+    const { source_chat_id, target_chat_id, limit, onlyAlbums, source_topic_id, target_thread_id, allowRepeats } = req.body;
     const io = req.app.get('io');
     const bot = getBot();
 
@@ -80,7 +80,7 @@ router.post('/batch-forward', async (req, res) => {
     try {
         // Fetch last N media (fetching a bit more to ensure we get albums if mixed)
         // If we strictly limit by SQL, we might cut an album in half or get mostly singles.
-        let sql = 'SELECT message_id, media_group_id, file_id, caption, file_type, topic_id FROM media_log WHERE chat_id = ?';
+        let sql = 'SELECT message_id, media_group_id, file_id, caption, file_type, topic_id, file_unique_id FROM media_log WHERE chat_id = ?';
         const params = [source_chat_id];
 
         if (source_topic_id) {
@@ -122,6 +122,24 @@ router.post('/batch-forward', async (req, res) => {
                     };
 
                     if (batch.type === 'album' && batch.items.every(item => item.file_id)) {
+
+                        // Deduplication Check for Album (Check ALL items)
+                        if (!allowRepeats) {
+                            let alreadySent = false;
+                            for (const item of batch.items) {
+                                if (item.file_unique_id) {
+                                    const exists = db.prepare('SELECT 1 FROM sent_history WHERE target_chat_id = ? AND file_unique_id = ?').get(target_chat_id, item.file_unique_id);
+                                    if (exists) { alreadySent = true; break; }
+                                }
+                            }
+                            if (alreadySent) {
+                                i++; // Skip
+                                io.emit('log', { time: new Date().toLocaleTimeString(), type: 'system', message: `⏭️ Ignorado (Duplicado)` });
+                                io.emit('progress', { processed: i, total });
+                                continue;
+                            }
+                        }
+
                         // SEND ALBUM
                         const mediaGroup = batch.items.map(item => ({
                             type: item.file_type === 'video' ? 'video' : 'photo', // Simplified
@@ -130,6 +148,15 @@ router.post('/batch-forward', async (req, res) => {
                         }));
 
                         await bot.sendMediaGroup(target_chat_id, mediaGroup, options);
+
+                        // Mark as Sent
+                        for (const item of batch.items) {
+                            if (item.file_unique_id) {
+                                try {
+                                    db.prepare('INSERT OR IGNORE INTO sent_history (target_chat_id, file_unique_id) VALUES (?, ?)').run(target_chat_id, item.file_unique_id);
+                                } catch (e) { }
+                            }
+                        }
 
                         processed += batch.items.length;
                         io.emit('log', {
@@ -141,6 +168,16 @@ router.post('/batch-forward', async (req, res) => {
                         // FALLBACK TO SINGLE (CopyMessage)
                         for (const item of batch.items) {
 
+                            // Deduplication Single
+                            if (!allowRepeats && item.file_unique_id) {
+                                const exists = db.prepare('SELECT 1 FROM sent_history WHERE target_chat_id = ? AND file_unique_id = ?').get(target_chat_id, item.file_unique_id);
+                                if (exists) {
+                                    io.emit('log', { time: new Date().toLocaleTimeString(), type: 'system', message: `⏭️ Item Ignorado (Duplicado)` });
+                                    processed++;
+                                    continue;
+                                }
+                            }
+
                             // Copy options need to be per item + thread_id
                             const copyOptions = {
                                 caption: item.caption,
@@ -148,6 +185,14 @@ router.post('/batch-forward', async (req, res) => {
                             };
 
                             await bot.copyMessage(target_chat_id, source_chat_id, item.message_id, copyOptions);
+
+                            // Mark Sent
+                            if (item.file_unique_id) {
+                                try {
+                                    db.prepare('INSERT OR IGNORE INTO sent_history (target_chat_id, file_unique_id) VALUES (?, ?)').run(target_chat_id, item.file_unique_id);
+                                } catch (e) { }
+                            }
+
                             processed++;
                             io.emit('log', {
                                 time: new Date().toLocaleTimeString(),
@@ -194,7 +239,7 @@ router.get('/rules', (req, res) => {
 });
 router.post('/rules', (req, res) => {
     try {
-        const info = db.prepare('INSERT INTO forwarding_rules (source_chat_id, target_chat_id, title, target_thread_id) VALUES (?, ?, ?, ?)').run(req.body.source_chat_id, req.body.target_chat_id, req.body.title || 'Untitled', req.body.target_thread_id || null);
+        const info = db.prepare('INSERT INTO forwarding_rules (source_chat_id, target_chat_id, title, target_thread_id, source_thread_id) VALUES (?, ?, ?, ?, ?)').run(req.body.source_chat_id, req.body.target_chat_id, req.body.title || 'Untitled', req.body.target_thread_id || null, req.body.source_thread_id || null);
         res.json({ id: info.lastInsertRowid, ...req.body, active: 1 });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

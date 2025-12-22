@@ -10,15 +10,16 @@ function App() {
   const [rules, setRules] = useState([]);
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newRule, setNewRule] = useState({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '' });
+  const [newRule, setNewRule] = useState({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '', source_thread_id: '' });
 
   // Batch State
-  const [batch, setBatch] = useState({ source_chat_id: '', target_chat_id: '', limit: 50, onlyAlbums: false, source_topic_id: '', target_thread_id: '' });
+  const [batch, setBatch] = useState({ source_chat_id: '', target_chat_id: '', limit: 50, onlyAlbums: false, source_topic_id: '', target_thread_id: '', allowRepeats: false });
   const [mediaCount, setMediaCount] = useState(null);
   const [progress, setProgress] = useState(null);
 
   // Topics State
   const [ruleTargetTopics, setRuleTargetTopics] = useState([]);
+  const [ruleSourceTopics, setRuleSourceTopics] = useState([]); // New
   const [batchSourceTopics, setBatchSourceTopics] = useState([]);
   const [batchTargetTopics, setBatchTargetTopics] = useState([]);
 
@@ -67,6 +68,7 @@ function App() {
   const fetchTopics = async (chatId, type) => {
     if (!chatId || chatId === 'custom') {
       if (type === 'ruleTarget') setRuleTargetTopics([]);
+      if (type === 'ruleSource') setRuleSourceTopics([]);
       if (type === 'batchSource') setBatchSourceTopics([]);
       if (type === 'batchTarget') setBatchTargetTopics([]);
       return;
@@ -79,6 +81,7 @@ function App() {
       const data = await res.json();
 
       if (type === 'ruleTarget') setRuleTargetTopics(data);
+      if (type === 'ruleSource') setRuleSourceTopics(data);
       if (type === 'batchSource') setBatchSourceTopics(data);
       if (type === 'batchTarget') setBatchTargetTopics(data);
     } catch (e) { console.error(e); }
@@ -97,6 +100,11 @@ function App() {
   useEffect(() => {
     fetchTopics(newRule.target_chat_id, 'ruleTarget');
   }, [newRule.target_chat_id]);
+
+  // When Rule Source changes, fetch topics
+  useEffect(() => {
+    fetchTopics(newRule.source_chat_id, 'ruleSource');
+  }, [newRule.source_chat_id]);
 
   // When Batch Source/Target changes
   useEffect(() => {
@@ -117,7 +125,7 @@ function App() {
         body: JSON.stringify(newRule),
       });
       if (res.ok) {
-        setNewRule({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '' });
+        setNewRule({ source_chat_id: '', target_chat_id: '', title: '', target_thread_id: '', source_thread_id: '' });
         fetchData();
         addLog({ message: 'Regra adicionada', type: 'success', time: new Date().toLocaleTimeString() });
       }
@@ -247,6 +255,13 @@ function App() {
                   {renderChatSelect(newRule.source_chat_id, (v) => setNewRule({ ...newRule, source_chat_id: v }))}
                 </div>
                 <div className="form-group">
+                  <label>Tópico Origem</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {renderTopicSelect(newRule.source_thread_id || '', (v) => setNewRule({ ...newRule, source_thread_id: v }), ruleSourceTopics, 'Todos / Geral')}
+                    <button type="button" className="btn icon-only secondary small" onClick={() => fetchTopics(newRule.source_chat_id, 'ruleSource')} title="Atualizar Tópicos"><RefreshCw size={14} /></button>
+                  </div>
+                </div>
+                <div className="form-group">
                   <label>Destino (Receptor)</label>
                   {renderChatSelect(newRule.target_chat_id, (v) => setNewRule({ ...newRule, target_chat_id: v }))}
                 </div>
@@ -314,6 +329,17 @@ function App() {
                   </label>
                 </div>
 
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={batch.allowRepeats}
+                      onChange={(e) => setBatch({ ...batch, allowRepeats: e.target.checked })}
+                    />
+                    <span>Permitir Mídias Repetidas</span>
+                  </label>
+                </div>
+
                 <button type="submit" className="btn accent full-width" disabled={!!progress}>
                   <Send size={16} /> {progress ? 'Enviando...' : 'Iniciar Envio'}
                 </button>
@@ -365,6 +391,7 @@ function App() {
                         <td>
                           <div className="flow">
                             <span className="source">{rule.source_title || rule.source_chat_id}</span>
+                            {rule.source_thread_id && <span className="thread-badge source-badge">Top:{rule.source_thread_id}</span>}
                             <span className="arrow">➔</span>
                             <div className="target-container">
                               <span className="target">{rule.target_title || rule.target_chat_id}</span>

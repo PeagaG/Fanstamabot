@@ -285,15 +285,20 @@ td {
 
 /* Thread Badge */
 .target-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .thread-badge {
-    background: rgba(139, 92, 246, 0.2);
-    color: var(--purple-color);
-    font-size: 0.7rem;
-    padding: 1px 5px;
-    border-radius: 4px;
+  background: rgba(139, 92, 246, 0.2);
+  color: var(--purple-color);
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.source-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--accent-color);
 }

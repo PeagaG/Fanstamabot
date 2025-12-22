@@ -51,6 +51,12 @@ db.exec(`
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(chat_id, message_id)
     );
+    CREATE TABLE IF NOT EXISTS sent_history (
+        target_chat_id TEXT NOT NULL,
+        file_unique_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(target_chat_id, file_unique_id)
+    );
 `);
 
 // Auto-migration for existing tables
@@ -72,6 +78,14 @@ try {
 
 try {
     db.prepare('ALTER TABLE media_log ADD COLUMN topic_id INTEGER').run();
+} catch (e) { /* Column likely exists */ }
+
+try {
+    db.prepare('ALTER TABLE forwarding_rules ADD COLUMN source_thread_id INTEGER').run();
+} catch (e) { /* Column likely exists */ }
+
+try {
+    db.prepare('ALTER TABLE media_log ADD COLUMN file_unique_id TEXT').run();
 } catch (e) { /* Column likely exists */ }
 
 module.exports = db;
